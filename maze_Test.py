@@ -1,75 +1,64 @@
 import gym
 import gym_maze
 import numpy as np
+import matplotlib.pyplot as plt
 
 env = gym.make('Maze-v0')
 
 
 LEARNING_RATE = 0.1
-DISCOUNT = 0.95
-EPISODES = 2500
-SHOW_EVERY = 100
-epsilon = 0.5
-START_EPS_DECAY = 1
-STATS_EVERY = 50
-END_EPS_DECAY = EPISODES//2
-epsilon_decay_value = epsilon//(END_EPS_DECAY - START_EPS_DECAY)
+DISCOUNT = 1
+epsilon = 1.0
+STATS_EVERY = 100
 
-done = False
+q_table = {}
+for state in env.state_space:
+    for action in env.action_space:
+        q_table[state, action] = 0
 
-q_table = np.zeros((81, 4))
+num_games = 10000
+totalRewards = np.zeros(num_games)
 
-# episode_rewards = []
-# aggr_ep_rewards = {'ep': [], 'avg': [], 'max': [], 'min': []}
 
-for episode in range(EPISODES):
-    state = env.reset()
+def max_action(q, state, actions):
+    values = np.array([q[state, a] for a in actions])
+    action = np.argmax(values)
+    return actions[action]
+
+
+for i in range(num_games):
+
     done = False
-
-    if episode % SHOW_EVERY == 0:
-        render = True
-        print(episode)
-    else:
-        render = False
+    epRewards = 0
+    observation = env.reset()
 
     while not done:
+        rand = np.random.random()
+        action = max_action(q_table, observation, env.action_space) if rand < (1-epsilon) \
+            else env.action_space_sample()
+        observation_, reward, done, info = env.step(action)
+        epRewards += reward
+        action_ = max_action(q_table, observation_, env.action_space)
+        q_table[observation, action] = q_table[observation, action] + LEARNING_RATE*(reward + DISCOUNT*q_table[observation_, action_] - q_table[observation, action])
+        observation = observation_
 
-        if np.random.random() > epsilon:
-            # Get action from Q table
-            action = np.argmax(q_table[state])
-        else:
-            # Get random action
-            action = np.random.randint(0, 4)
+    if epsilon - 2 / num_games > 0:
+        epsilon -= 2/num_games
+    else:
+        epsilon = 0
+    totalRewards[i] = epRewards
 
-        new_state, reward, done, _ = env.step(action)
-
-        new_state = new_state
-
-        if (episode % SHOW_EVERY) == 0:
-            env.render()
-
-        # If simulation did not end yet after last step - update Q table
-        if not done:
-
-            # Maximum possible Q value in next step (for new state)
-            max_future_q = np.max(q_table[new_state, :])
-
-            # Current Q value (for current state and performed action)
-            current_q = q_table[state, action]
-
-            # And here's our equation for a new Q value for current state and action
-            new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (reward + DISCOUNT * max_future_q)
-
-            # Update Q table with new Q value
-            q_table[state, action] = new_q
+    if i % STATS_EVERY == 0:
+        print('starting game', i)
 
 
-        state = new_state
+plt.plot(totalRewards)
+plt.xlabel("Number of Attempts")
+plt.ylabel('Attempt Reward')
+plt.title("Attempt Reward vs. Number of Attempts")
 
-    # Decaying is being done every episode if episode number is within decaying range
-    if END_EPS_DECAY >= episode >= START_EPS_DECAY:
-        epsilon -= epsilon_decay_value
+plt.show()
 
 
-env.close()
+
 
