@@ -7,7 +7,7 @@ maze = np.ones((9, 9))
 for each in enemy_list:
     maze[each // 9, each % 9] = 0
 
-maze[9, 9] = 0.5
+maze[8, 8] = 0.5
 maze[0, 0] = 0.75
 plt.imshow(maze, cmap="gray")
 plt.show()
